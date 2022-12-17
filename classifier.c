@@ -54,22 +54,6 @@ struct data testing_data[DATASET_SIZE];
 
 struct layer layers[TOTAL_LAYERS];
 
-// Initialize the number of neurons per layer, and initialize the weights
-int create_architecture(){
-    int layer_size[TOTAL_LAYERS] = {d, H1_NEURONS, H2_NEURONS, H3_NEURONS, K};
-    int i,j;
-    for(i=0; i<TOTAL_LAYERS; i++){
-        layers[i] = initialize_layer(layer_size[i]);
-
-        for(j=0; j<layer_size[i]; j++){
-            if(i < TOTAL_LAYERS - 1){
-                layers[i].network[j] = initialize_neuron(layer_size[i+1]);
-            }
-        }
-    }
-    initialize_weights();
-}
-
 struct neuron initialize_neuron(int out_weights_number){
     struct neuron neuron;
     if(neuron.out_weights = (float*) malloc(out_weights_number * sizeof(float))){
@@ -95,7 +79,7 @@ void initialize_weights(){
         for(j=0; j<layers[i].neurons_num; j++){
             for(k=0; k<layers[i + 1].neurons_num; k++){
                 layers[i].network[j].out_weights[k] = (float)rand() / (float)RAND_MAX ; // [0,1]
-                print("weight: %f", layers[i].network[j].out_weights[k]);
+                printf("weight: %f", layers[i].network[j].out_weights[k]);
             }
             // I don't get that
             if(i > 0){
@@ -107,6 +91,22 @@ void initialize_weights(){
         layers[TOTAL_LAYERS-1].network[j].bias = (float)rand() / (float)RAND_MAX ; //[0,1]
     }
 }
+// Initialize the number of neurons per layer, and initialize the weights
+int create_architecture(){
+    int layer_size[TOTAL_LAYERS] = {d, H1_NEURONS, H2_NEURONS, H3_NEURONS, K};
+    int i,j;
+    for(i=0; i<TOTAL_LAYERS; i++){
+        layers[i] = initialize_layer(layer_size[i]);
+
+        for(j=0; j<layer_size[i]; j++){
+            if(i < TOTAL_LAYERS - 1){
+                layers[i].network[j] = initialize_neuron(layer_size[i+1]);
+            }
+        }
+    }
+    initialize_weights();
+}
+
 // Read from buffer(file line), and create a new data structure of type Data
 struct data createDataStruct(char *buffer){
     // copy buffer into a string to remove "," and get each element(x1,x2,c)
