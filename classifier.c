@@ -212,15 +212,8 @@ void activationFunction(int layer, int neuron){
         sigmoid(layer,neuron);
     }
 }
-/*
-Calculate values of the output layers from the inputs data(From first to last layer)
 
-@param in_vector_x: input vector
-@param in_d       : input vector's dimension
-@param out_vector : output vector
-@param out_K      : output vector's dimension  
-*/
-void forwardPass(float *in_vector_x, int in_d, float *out_vector_y, int out_K){
+void forwardPass(){
     int i,j,k;
     float prev_out_weight;
     float prev_actv;
@@ -235,7 +228,7 @@ void forwardPass(float *in_vector_x, int in_d, float *out_vector_y, int out_K){
                 prev_out_weight = layers[i-1].network[k].out_weights[j];
 
                 layers[i].network[j].value +=  prev_actv * prev_out_weight;
-                // Now we need to use the activation function on 'actv'
+                // Now we need to use the activation function to update the 'actv' value
                 activationFunction(i,j);
             }
         }
@@ -248,7 +241,6 @@ void trainNetwork(){
         forwardPass();
     }
 }
-
 //----------------------------------PRINT-------------------------------------------
 void printDataset(char *dataset_name, struct data *dataset, int dataset_size){
     int i,k;
