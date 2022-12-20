@@ -3,19 +3,21 @@
 #include <string.h>
 #include <time.h>
 
-#define d 2 
+// Hyper parameters
+#define TOTAL_LAYERS 5
+#define d 2 // not sure if it has to be 2
 #define K 3 // Number of categories
 #define H1_NEURONS 6
 #define H2_NEURONS 4
 #define H3_NEURONS 2
 #define ACTIVATION_FUNCTION 0 //0 for "tanh", 1 for "relu"
 
-#define TOTAL_LAYERS 5
+#define LEARNING_RATE 0.15
+#define EXIT_THRESHOLD 0.01
 
-#define LEARNING_RATE ?
-#define EXIT_THRESHOLD ?
+#define TRAINING_DATA 4000 
+#define TESTING_DATA 4000 
 
-#define DATASET_SIZE  5
 
 /* Encoding the categories (defining the desired outputs for each category) as vectors.
 e.g. 
@@ -40,20 +42,24 @@ struct data {
 // MPL neuron
 struct neuron{
     float *out_weights;
-    float bias;
+    float bias; // polwsh 
+    float value; // value of neuron each moment
+    float actv; // total input. Activates the neuron
 };
 
+// All layers of the MultiLayer Perceptron(MPL)
 struct layer{
     int neurons_num;
     struct neuron *network ; 
 };
 
 // Global 
-struct data training_data[DATASET_SIZE];
-struct data testing_data[DATASET_SIZE];
+struct data training_data[TRAINING_DATA];
+struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
 
+//----------------------------------CREATE ARCHITECTURE-----------------------------------------------------------------------
 struct neuron initialize_neuron(int out_weights_number){
     struct neuron neuron;
     if(neuron.out_weights = (float*) malloc(out_weights_number * sizeof(float))){
@@ -73,40 +79,51 @@ struct layer initialize_layer(int layer_size){
     exit(3);
 }
 
+// Initialize random weights for Layers: Input + Hidden
 void initialize_weights(){
     int i,k,j;
-    for(i=0; i<TOTAL_LAYERS -1; i++){
-        for(j=0; j<layers[i].neurons_num; j++){
-            for(k=0; k<layers[i + 1].neurons_num; k++){
-                layers[i].network[j].out_weights[k] = (float)rand() / (float)RAND_MAX ; // [0,1]
-                printf("weight: %f", layers[i].network[j].out_weights[k]);
-            }
-            // I don't get that
-            if(i > 0){
-                layers[i].network[j].bias = (float)rand() / (float)RAND_MAX ; //[0,1]
-            }
-        }
-    }// don't get it
-    for(j=0; j < layers[TOTAL_LAYERS-1].neurons_num; j++){
-        layers[TOTAL_LAYERS-1].network[j].bias = (float)rand() / (float)RAND_MAX ; //[0,1]
-    }
+    for(i=0; i<TOTAL_LAYERS -1; i++){ 
+        for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
+            for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
+                layers[i].network[j].out_weights[k] = ((float)(rand() % 200) / (float)100) - 1; } } } // [-1,1]
+
 }
-// Initialize the number of neurons per layer, and initialize the weights
-int create_architecture(){
+// Initialize biases for Layers: Hidden + Output
+// Input layer does not contain biases
+void initialize_biases(){
+    int i,j;
+    for(i=1; i<TOTAL_LAYERS; i++){ 
+        for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
+            layers[i].network[j].bias = ((float)(rand() % 200) / (float)100) - 1;} }//[-1,1]
+}
+/* 
+Initialize number of neurons per layer
+Initialize weights
+Initialize biases
+*/
+int createArchitecture(){
     int layer_size[TOTAL_LAYERS] = {d, H1_NEURONS, H2_NEURONS, H3_NEURONS, K};
     int i,j;
     for(i=0; i<TOTAL_LAYERS; i++){
         layers[i] = initialize_layer(layer_size[i]);
-
         for(j=0; j<layer_size[i]; j++){
-            if(i < TOTAL_LAYERS - 1){
+            // output layer had only 1 weight, which is the final output
+            if(!checkIfOutputLayer(i)){
                 layers[i].network[j] = initialize_neuron(layer_size[i+1]);
             }
         }
     }
+    printf("Created Layers: %d\n",TOTAL_LAYERS);
     initialize_weights();
+    initialize_biases();
 }
 
+int checkIfOutputLayer(i){
+    if(i < TOTAL_LAYERS -1){
+        return 0; 
+    }return 1; // Output Layer 
+}
+//------------------------------------------------LOAD DATASETS-----------------------------------------------
 // Read from buffer(file line), and create a new data structure of type Data
 struct data createDataStruct(char *buffer){
     // copy buffer into a string to remove "," and get each element(x1,x2,c)
@@ -133,7 +150,7 @@ struct data createDataStruct(char *buffer){
     return data;
 
 }
-void loadDataset(char *filename,struct data *dataset){
+void loadDataset(char *filename,struct data *dataset, int dataset_size){
     char buffer[30];
     FILE *fptr;
     struct data data;
@@ -147,8 +164,8 @@ void loadDataset(char *filename,struct data *dataset){
     i = 0;
     while (fgets(buffer, 30, fptr) != NULL){
         data = createDataStruct(buffer);
-        if(i > DATASET_SIZE){
-            printf("'%s': File size is bigger than expected:(%d)",filename,DATASET_SIZE);
+        if(i > dataset_size){
+            printf("'%s': File size is bigger than expected:(%d)",filename,dataset_size);
             exit(1);
         }
         dataset[i].x1 = data.x1;
@@ -161,11 +178,82 @@ void loadDataset(char *filename,struct data *dataset){
    }
     fclose(fptr);
 }
+//----------------------------------FORWARD PASS------------------------------------
+void putInput(float x1, float x2){
+    layers[0].network[0].actv =  x1;
+    layers[0].network[1].actv =  x2;
+}
+void relu(int layer, int neuron){
+    if(layers[layer].network[neuron].value < 0){
+        layers[layer].network[neuron].actv = 0;
+    }else{
+        layers[layer].network[neuron].actv = layers[layer].network[neuron].value;
+    }
+}
+void tahn(int layer, int neuron){
+    float x = layers[layer].network[neuron].value;
+    float tahn_result =  ((float)exp(x) - (float)exp(-x)) / (float)(exp(x) + (float)exp(-x));
+    layers[layer].network[neuron].actv = tahn_result;
+}
+void sigmoid(int layer, int neuron){
+    float x = layers[layer].network[neuron].value;
+    float sigmoid_result = (float)1.0/((float)1.0+(float)exp(-(x)));
+    layers[layer].network[neuron].actv = sigmoid_result;
+}
+void activationFunction(int layer, int neuron){
+    if(!checkIfOutputLayer(layer)){ // Hidded Layer
+        if(ACTIVATION_FUNCTION == 0 ){ 
+            tahn(layer,neuron);
+        }
+        else{                         
+            relu(layer,neuron);
+        }
+    }else{                         // Output Layer
+        sigmoid(layer,neuron);
+    }
+}
+/*
+Calculate values of the output layers from the inputs data(From first to last layer)
 
-void printDataset(char *dataset_name, struct data *dataset){
+@param in_vector_x: input vector
+@param in_d       : input vector's dimension
+@param out_vector : output vector
+@param out_K      : output vector's dimension  
+*/
+void forwardPass(float *in_vector_x, int in_d, float *out_vector_y, int out_K){
+    int i,j,k;
+    float prev_out_weight;
+    float prev_actv;
+    int act_fun;
+    int sum = 0;
+    for(i=1; i<TOTAL_LAYERS; i++){
+        for(j=0; j<layers[i].neurons_num; j++){
+            layers[i].network[j].value = layers[i].network[j].bias;
+
+            for(k=0; k<layers[i-1].neurons_num; k++){
+                prev_actv       = layers[i-1].network[k].actv;
+                prev_out_weight = layers[i-1].network[k].out_weights[j];
+
+                layers[i].network[j].value +=  prev_actv * prev_out_weight;
+                // Now we need to use the activation function on 'actv'
+                activationFunction(i,j);
+            }
+        }
+    }
+} 
+void trainNetwork(){
+    int i,j;
+    for(i=0; i<TRAINING_DATA; i++){
+        putInput(training_data[i].x1, training_data[i].x2);
+        forwardPass();
+    }
+}
+
+//----------------------------------PRINT-------------------------------------------
+void printDataset(char *dataset_name, struct data *dataset, int dataset_size){
     int i,k;
     printf("%s\n",dataset_name);
-    for(i=0; i < DATASET_SIZE; i++){
+    for(i=0; i < dataset_size; i++){
         printf("x1:%f, x2:%f, c:%d, vector:( ",dataset[i].x1,dataset[i].x2,dataset[i].c);
         for(k=0; k<K; k++){
             printf("%d ",dataset[i].vector.vec[k]);
@@ -173,11 +261,50 @@ void printDataset(char *dataset_name, struct data *dataset){
         printf(")\n");
     }
 }
+
+void printLayers(){
+    int i,j,k;
+    int out_weights_size;
+    for(i=0; i<TOTAL_LAYERS; i++){
+        printf("\nLAYER: %d\nNEURONS: %d\n", i, layers[i].neurons_num);
+        for(j=0; j<layers[i].neurons_num; j++){
+            
+            printf("(neuron %d) ",j);
+            printf("BIAS: %f ",layers[i].network[j].bias);
+            if( i < TOTAL_LAYERS -1){    
+                out_weights_size = sizeof(layers[i].network[j].out_weights)/sizeof(layers[i].network[j].out_weights[0]);
+                printf("WEIGHTS: ");
+                for(k=0; k<out_weights_size; k++){
+                    printf("%f ",layers[i].network[j].out_weights[k]);
+                }
+            }printf("\n");
+        }
+    }
+}
+//----------------------------------------MAIN--------------------------------------
 void main(){
-    loadDataset("training_data.txt", training_data);
-    loadDataset("testing_data.txt", testing_data);
-    printDataset("Training data",training_data);
-    printDataset("Testing data",testing_data);
+    loadDataset("training_data.txt", training_data, TRAINING_DATA);
+    loadDataset("testing_data.txt", testing_data, TESTING_DATA);
+    createArchitecture();
+    trainNetwork();
+    printLayers();
+    //printDataset("Training data",training_data);
+    //printDataset("Testing data",testing_data);
     //createTestingDataset()
     //createTrainingDataset
 }
+
+/*
+1) Why Initialize a Neural Network with Random Weights? https://machinelearningmastery.com/why-initialize-a-neural-network-with-random-weights/
+
+2) How does the bias works in Neural Networks? 
+Bias can be considered as an additional set of weights in a model that doesn’t need any input, and related to the output of the model when it has no inputs.
+Adding a constant to the input bias allows to shift the activation function. 
+There, a bias works exactly the same way it does in a linear equation:
+
+bias = mx + c
+
+In a scenario with bias, the input to the activation function is 'x' times the connection weight 'w0' plus the bias times the connection weight for the bias 'w1'. This has the effect of shifting the activation function by a constant amount (b * w1).
+
+3)forward-pass https://www.google.com/search?q=forward-pass+in+neural+network&source=lnms&tbm=vid&sa=X&ved=2ahUKEwiRgMb2lon8AhUoS_EDHd4bCJoQ_AUoAnoECAEQBA&biw=768&bih=702&dpr=1.25#fpstate=ive&vld=cid:ea47a04d,vid:UJwK6jAStmg
+*/
