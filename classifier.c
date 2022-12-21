@@ -101,6 +101,7 @@ void initialize_weights(){
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
             for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
                 layers[i].network[j].out_weights[k] = ((float)(rand() % 200) / (float)100) - 1; } } } // [-1,1]
+                layers[i].network[j].d_out_weights[k] = 0.0;
 
 }
 // Initialize biases for Layers: Hidden + Output
@@ -289,7 +290,7 @@ void backPropagationHiddenLayers(){
 }
 void backPropagation(struct vector vector){
     backPropagationOutputLayer(vector);
-    backPropagationOutputLayer();
+    backPropagationHiddenLayers();
 }
 
 //----------------------------------PRINT-------------------------------------------
