@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 // Hyper parameters
 #define TOTAL_LAYERS 5
@@ -58,6 +59,12 @@ struct data training_data[TRAINING_DATA];
 struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
+
+int checkIfOutputLayer(int i){
+    if(i < TOTAL_LAYERS -1){
+        return 0; 
+    }return 1; // Output Layer 
+}
 //----------------------------------CREATE ARCHITECTURE-----------------------------------------------------------------------
 struct neuron initialize_neuron(int out_weights_number){
     struct neuron neuron;
@@ -115,12 +122,6 @@ int createArchitecture(){
     printf("Created Layers: %d\n",TOTAL_LAYERS);
     initialize_weights();
     initialize_biases();
-}
-
-int checkIfOutputLayer(i){
-    if(i < TOTAL_LAYERS -1){
-        return 0; 
-    }return 1; // Output Layer 
 }
 //------------------------------------------------LOAD DATASETS-----------------------------------------------
 // Read from buffer(file line), and create a new data structure of type Data
