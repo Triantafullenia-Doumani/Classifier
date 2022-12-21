@@ -23,10 +23,10 @@
 e.g. 
 C1 -> (1,0,0)
 C2 -> (0,1,0)
-C3 -> (0,0,1)  
-*/
+C3 -> (0,0,1) 
 
-//stackoverflow 241 likes: ' PLEASE don't typedef structs in C, it needlessly pollutes the global namespace which is typically very polluted already in large C programs.
+We will use later to calculate the total error because here we will store the correct output.
+*/
 struct vector{
     int vec[K];
 };
@@ -35,7 +35,7 @@ struct vector{
 struct data {
 	float x1;
 	float x2;
-	int c;
+	int c; //category
     struct vector vector;
 };
 
@@ -58,7 +58,6 @@ struct data training_data[TRAINING_DATA];
 struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
-
 //----------------------------------CREATE ARCHITECTURE-----------------------------------------------------------------------
 struct neuron initialize_neuron(int out_weights_number){
     struct neuron neuron;
@@ -234,13 +233,8 @@ void forwardPass(){
         }
     }
 } 
-void trainNetwork(){
-    int i,j;
-    for(i=0; i<TRAINING_DATA; i++){
-        putInput(training_data[i].x1, training_data[i].x2);
-        forwardPass();
-    }
-}
+
+//----------------------------------BACK PROPAGATION--------------------------------
 //----------------------------------PRINT-------------------------------------------
 void printDataset(char *dataset_name, struct data *dataset, int dataset_size){
     int i,k;
@@ -271,6 +265,27 @@ void printLayers(){
                 }
             }printf("\n");
         }
+    }
+}
+//-----------------------------------------ERROR-------------------------------------
+float calculateError(struct vector vector){
+    float diff,error = 0;
+    int i;
+    for(i=0; i<K; i++){ // K = 3(num of categories)
+        diff = vector.vec[i] - layers[TOTAL_LAYERS -1].network[i].actv;
+        error += (float)pow(diff,2);
+    }
+    error = ((float)0.5*error);
+    return error;
+}
+//----------------------------------------TRAIN-------------------------------------
+void trainNetwork(){
+    int i,j;
+    float total_error = 0;
+    for(i=0; i<TRAINING_DATA; i++){
+        putInput(training_data[i].x1, training_data[i].x2);
+        forwardPass();
+        total_error+= calculateError(training_data->vector);
     }
 }
 //----------------------------------------MAIN--------------------------------------
