@@ -249,12 +249,14 @@ void forwardPass(){
 void backPropagationOutputLayer(struct vector vector){
     int i,k;
     float actv,d_value;
-    float prev_actv, prev_weight;
+    float prev_actv, prev_weight; // act and weight of a neuron of the previous layer
     float correct_out;
+
     for(i=0; i<K; i++){
         prev_actv = layers[TOTAL_LAYERS - 1].network[i].actv;
         correct_out = vector.vec[i];
         layers[TOTAL_LAYERS -1].network[i].d_value = actv - correct_out*actv*(1 - actv);
+
         for(k=0; k<H3_NEURONS; k++){
             prev_actv = layers[TOTAL_LAYERS-2].network[k].actv;
             d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
@@ -266,9 +268,28 @@ void backPropagationOutputLayer(struct vector vector){
         layers[TOTAL_LAYERS-1].network[i].d_bias = d_value;
     }
 }
-void backPropagation(){
-    
-
+void backPropagationHiddenLayers(){
+    int i,j,k;
+    for(i=TOTAL_LAYERS -2; i==1; i--){
+        for(j=0;j<layers[i].neurons_num; j++){
+            if(layers[i].network[j].value >=0){
+                layers[i].network[j].d_value = layers[i].network[j].d_actv;
+            }else{
+                layers[i].network[j].d_value = 0;
+            }
+            for(k=0; k<layers[i-1].neurons_num; k++){
+                layers[i-1].network[k].d_out_weights[j] = layers[i].network[j].d_value * layers[i-1].network[k].actv;
+                if(i>1){
+                    layers[i-1].network[k].d_actv = layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
+                }
+            }
+            layers[i].network[j].d_bias = layers[i].network[j].d_value;
+        }
+    }
+}
+void backPropagation(struct vector vector){
+    backPropagationOutputLayer(vector);
+    backPropagationOutputLayer();
 }
 
 //----------------------------------PRINT-------------------------------------------
