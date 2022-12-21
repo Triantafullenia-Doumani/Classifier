@@ -16,8 +16,8 @@
 #define LEARNING_RATE 0.15
 #define EXIT_THRESHOLD 0.01
 
-#define TRAINING_DATA 4000 
-#define TESTING_DATA 4000 
+#define TRAINING_DATA 5 // TODO-> change to 4000
+#define TESTING_DATA 5 // TODO-> change to 4000
 
 
 /* Encoding the categories (defining the desired outputs for each category) as vectors.
@@ -46,6 +46,11 @@ struct neuron{
     float bias; // polwsh 
     float value; // value of neuron each moment
     float actv; // total input. Activates the neuron
+
+    float d_out_weight; // derivative of weight 
+    float d_bias; //derivative of bias 
+    float d_value; // derivative of value
+    float d_actv; // derivative of act 
 };
 
 // All layers of the MultiLayer Perceptron(MPL)
@@ -236,6 +241,10 @@ void forwardPass(){
 } 
 
 //----------------------------------BACK PROPAGATION--------------------------------
+void backPropagation(){
+
+}
+
 //----------------------------------PRINT-------------------------------------------
 void printDataset(char *dataset_name, struct data *dataset, int dataset_size){
     int i,k;
@@ -287,7 +296,9 @@ void trainNetwork(){
         putInput(training_data[i].x1, training_data[i].x2);
         forwardPass();
         total_error+= calculateError(training_data->vector);
+        backPropagation();
     }
+    printf("Total Error after training: %f",total_error);
 }
 //----------------------------------------MAIN--------------------------------------
 void main(){
@@ -296,8 +307,8 @@ void main(){
     createArchitecture();
     trainNetwork();
     printLayers();
-    //printDataset("Training data",training_data);
-    //printDataset("Testing data",testing_data);
+    printDataset("Training data",training_data,TRAINING_DATA);
+    //printDataset("Testing data",testing_data,TESTING_DATA);
     //createTestingDataset()
     //createTrainingDataset
 }
