@@ -47,7 +47,7 @@ struct neuron{
     float value; // value of neuron each moment
     float actv; // total input. Activates the neuron
 
-    float d_out_weight; // derivative of weight 
+    float *d_out_weights; // derivative of weights 
     float d_bias; //derivative of bias 
     float d_value; // derivative of value
     float d_actv; // derivative of act 
@@ -73,11 +73,15 @@ int checkIfOutputLayer(int i){
 //----------------------------------CREATE ARCHITECTURE-----------------------------------------------------------------------
 struct neuron initialize_neuron(int out_weights_number){
     struct neuron neuron;
-    if(neuron.out_weights = (float*) malloc(out_weights_number * sizeof(float))){
-        return neuron;
+    if(!(neuron.out_weights = (float*) malloc(out_weights_number * sizeof(float)))){
+        printf("Initialize neuron failed");
+        exit(2);
     }
-    printf("Initialize neuron failed.");
-    exit(2);
+    if(!(neuron.d_out_weights = (float*) malloc(out_weights_number * sizeof(float)))){
+        printf("Initialize neuron failed");
+        exit(2);
+    }
+    return neuron;
 }
 
 struct layer initialize_layer(int layer_size){
@@ -241,7 +245,29 @@ void forwardPass(){
 } 
 
 //----------------------------------BACK PROPAGATION--------------------------------
+// back propagation for Output Layer
+void backPropagationOutputLayer(struct vector vector){
+    int i,k;
+    float actv,d_value;
+    float prev_actv, prev_weight;
+    float correct_out;
+    for(i=0; i<K; i++){
+        prev_actv = layers[TOTAL_LAYERS - 1].network[i].actv;
+        correct_out = vector.vec[i];
+        layers[TOTAL_LAYERS -1].network[i].d_value = actv - correct_out*actv*(1 - actv);
+        for(k=0; k<H3_NEURONS; k++){
+            prev_actv = layers[TOTAL_LAYERS-2].network[k].actv;
+            d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
+            layers[TOTAL_LAYERS-2].network[k].d_out_weights[i] = prev_actv * d_value;
+            
+            prev_weight = layers[TOTAL_LAYERS-2].network[k].out_weights[i];
+            layers[TOTAL_LAYERS-2].network[k].d_actv = prev_weight * d_value;
+        }
+        layers[TOTAL_LAYERS-1].network[i].d_bias = d_value;
+    }
+}
 void backPropagation(){
+    
 
 }
 
@@ -296,7 +322,7 @@ void trainNetwork(){
         putInput(training_data[i].x1, training_data[i].x2);
         forwardPass();
         total_error+= calculateError(training_data->vector);
-        backPropagation();
+        backPropagation(training_data->vector);
     }
     printf("Total Error after training: %f",total_error);
 }
