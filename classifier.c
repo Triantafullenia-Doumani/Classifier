@@ -19,6 +19,7 @@
 #define TRAINING_DATA 5 // TODO-> change to 4000
 #define TESTING_DATA 5 // TODO-> change to 4000
 
+#define MIN_REPETITIONS 700
 
 /* Encoding the categories (defining the desired outputs for each category) as vectors.
 e.g. 
@@ -71,7 +72,7 @@ int checkIfOutputLayer(int i){
     }return 1; // Output Layer 
 }
 //----------------------------------CREATE ARCHITECTURE-----------------------------------------------------------------------
-struct neuron initialize_neuron(int out_weights_number){
+struct neuron initializeNeuron(int out_weights_number){
     struct neuron neuron;
     if(!(neuron.out_weights = (float*) malloc(out_weights_number * sizeof(float)))){
         printf("Initialize neuron failed");
@@ -84,7 +85,7 @@ struct neuron initialize_neuron(int out_weights_number){
     return neuron;
 }
 
-struct layer initialize_layer(int layer_size){
+struct layer initializeLayer(int layer_size){
     struct layer layer;
     layer.neurons_num = layer_size;
     if(layer.network = (struct neuron*)malloc(layer_size * sizeof(struct neuron))){
@@ -95,7 +96,7 @@ struct layer initialize_layer(int layer_size){
 }
 
 // Initialize random weights for Layers: Input + Hidden
-void initialize_weights(){
+void initializeWeights(){
     int i,k,j;
     for(i=0; i<TOTAL_LAYERS -1; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
@@ -106,7 +107,7 @@ void initialize_weights(){
 }
 // Initialize biases for Layers: Hidden + Output
 // Input layer does not contain biases
-void initialize_biases(){
+void initializeBiases(){
     int i,j;
     for(i=1; i<TOTAL_LAYERS; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
@@ -121,17 +122,17 @@ int createArchitecture(){
     int layer_size[TOTAL_LAYERS] = {d, H1_NEURONS, H2_NEURONS, H3_NEURONS, K};
     int i,j;
     for(i=0; i<TOTAL_LAYERS; i++){
-        layers[i] = initialize_layer(layer_size[i]);
+        layers[i] = initializeLayer(layer_size[i]);
         for(j=0; j<layer_size[i]; j++){
             // output layer had only 1 weight, which is the final output
             if(!checkIfOutputLayer(i)){
-                layers[i].network[j] = initialize_neuron(layer_size[i+1]);
+                layers[i].network[j] = initializeNeuron(layer_size[i+1]);
             }
         }
     }
     printf("Created Layers: %d\n",TOTAL_LAYERS);
-    initialize_weights();
-    initialize_biases();
+    initializeWeights();
+    initializeBiases();
 }
 //------------------------------------------------LOAD DATASETS-----------------------------------------------
 // Read from buffer(file line), and create a new data structure of type Data
@@ -292,7 +293,18 @@ void backPropagation(struct vector vector){
     backPropagationOutputLayer(vector);
     backPropagationHiddenLayers();
 }
-
+//----------------------------------UPDATE WEIGHTS---------------------------------
+void updateWeights(){
+    int i,k,j;
+    for(i=0; i<TOTAL_LAYERS -1; i++){ 
+        for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
+            for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
+                layers[i].network[j].out_weights[k] -= LEARNING_RATE * layers[i].network[j].d_out_weights[k];
+            }
+            layers[i].network[j].d_bias -= LEARNING_RATE * layers[i].network[j].d_bias;
+        }
+    }
+}
 //----------------------------------PRINT-------------------------------------------
 void printDataset(char *dataset_name, struct data *dataset, int dataset_size){
     int i,k;
@@ -336,24 +348,32 @@ float calculateError(struct vector vector){
     error = ((float)0.5*error);
     return error;
 }
-//----------------------------------------TRAIN-------------------------------------
-void trainNetwork(){
+//----------------------------------------Gradient Descent-------------------------------------
+void gradientDescent(){
     int i,j;
-    float total_error = 0;
-    for(i=0; i<TRAINING_DATA; i++){
-        putInput(training_data[i].x1, training_data[i].x2);
-        forwardPass();
-        total_error+= calculateError(training_data->vector);
-        backPropagation(training_data->vector);
+    float total_error, prev_total_error = 0;
+
+    while(1){
+        for(i=0; i<TRAINING_DATA; i++){
+            putInput(training_data[i].x1, training_data[i].x2);
+            forwardPass();
+            total_error+= calculateError(training_data->vector);
+            backPropagation(training_data->vector);
+            updateWeights();
+        }
+        printf("Total Error after training: %f",total_error);
+        prev_total_error = total_error;
+        if((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD){
+            printf("Training completed!\nTotal error:%f", total_error);
+        }
     }
-    printf("Total Error after training: %f",total_error);
 }
 //----------------------------------------MAIN--------------------------------------
 void main(){
     loadDataset("training_data.txt", training_data, TRAINING_DATA);
     loadDataset("testing_data.txt", testing_data, TESTING_DATA);
     createArchitecture();
-    trainNetwork();
+    gradientDescent();
     printLayers();
     printDataset("Training data",training_data,TRAINING_DATA);
     //printDataset("Testing data",testing_data,TESTING_DATA);
