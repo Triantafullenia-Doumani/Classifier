@@ -6,7 +6,7 @@
 
 // Hyper parameters
 #define TOTAL_LAYERS 5
-#define d 2 // not sure if it has to be 2
+#define d 2 // x1 x2
 #define K 3 // Number of categories
 #define H1_NEURONS 6
 #define H2_NEURONS 4
@@ -19,7 +19,14 @@
 #define TRAINING_DATA 5 // TODO-> change to 4000
 #define TESTING_DATA 5 // TODO-> change to 4000
 
-#define MIN_REPETITIONS 700
+#define MIN_EPOCHS 700
+
+/*About Batch sizes
+Small values give a learning process that converges quickly at the cost of noise in the training process.
+Large values give a learning process that converges slowly with accurate estimates of the error gradient.
+*/
+#define BATCH_SIZE 40 // TRAINING_DATA/10=400 or TRAINING_DATA/100=40
+
 
 /* Encoding the categories (defining the desired outputs for each category) as vectors.
 e.g. 
@@ -349,24 +356,32 @@ float calculateError(struct vector vector){
     return error;
 }
 //----------------------------------------Gradient Descent-------------------------------------
-void gradientDescent(){
+void gradientDescent_MiniBatch(){
     int i,j;
-    float total_error, prev_total_error = 0;
-
+    float total_error = 0;
+    float prev_total_error = 0;
+    int batch_size, epochs = 0;
     while(1){
         for(i=0; i<TRAINING_DATA; i++){
             putInput(training_data[i].x1, training_data[i].x2);
             forwardPass();
             total_error+= calculateError(training_data->vector);
             backPropagation(training_data->vector);
-            updateWeights();
+            if(batch_size == BATCH_SIZE){
+                updateWeights();
+                batch_size = 0;
+            }else{
+                batch_size++;
+            }
         }
         printf("Total Error after training: %f",total_error);
         prev_total_error = total_error;
-        if((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD){
+        if((epochs > MIN_EPOCHS) && ((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD)){
             printf("Training completed!\nTotal error:%f", total_error);
             exitProgramm(0);
         }
+        total_error = 0;
+        epochs++;
     }
 }
 //----------------------------------------EXIT-----------------------------------
