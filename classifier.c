@@ -11,7 +11,7 @@
 #define H1_NEURONS 6
 #define H2_NEURONS 4
 #define H3_NEURONS 2
-#define ACTIVATION_FUNCTION 0 //0 for "tanh", 1 for "relu"
+#define ACTIVATION_FUNCTION 1 //0 for "tanh", 1 for "relu"
 
 #define LEARNING_RATE 0.15
 #define EXIT_THRESHOLD 0.01
@@ -76,17 +76,13 @@ struct layer layers[TOTAL_LAYERS];
 
 // We chose as output neuron the neuron with the max act value
 int getCategory(struct neuron *network){
-    int i, max_actv = 0 ;
-    int category = -1;
-    for(i=0; i<K; i++){
+    int i, max_actv = network[0].actv ;
+    int category = 0;
+    for(i=1; i<K; i++){
         if(network[i].actv > max_actv ){
             max_actv = network[i].actv;
             category = i;
         }
-    }
-    if(category == -1){
-        printf("Unkown category!");
-        return -1;
     }
     return category + 1;
 }
@@ -341,7 +337,7 @@ void d_activationFunction(int layer, int neuron){
     }
 }
 void backPropagationHiddenLayers(){
-    int i,j,k;
+    int i,j,k,l;
     for(i=TOTAL_LAYERS -2; i>0; i--){
         for(j=0;j<layers[i].neurons_num; j++){
             //layers[i].network[j].d_actv = 0.0;
@@ -350,8 +346,6 @@ void backPropagationHiddenLayers(){
             for(k=0; k<layers[i-1].neurons_num; k++){
                 layers[i-1].network[k].d_out_weights[j] = layers[i].network[j].d_value * layers[i-1].network[k].actv;
                 if(i>1){
-
-                    // Should I do it for next of previous layer?!!!!!!!!!!!
                     layers[i-1].network[k].d_actv = layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
                 }
             }
