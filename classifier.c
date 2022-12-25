@@ -73,6 +73,16 @@ struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
 
+int getCategory(int* vec){
+    int i;
+    for(i=0; i<K; i++){
+        if(vec[i] == 1){
+            return i+1;
+        }
+    }
+    printf("Category not found!");
+    return 0;
+}
 int checkIfOutputLayer(int i){
     if(i < TOTAL_LAYERS -1){
         return 0; 
@@ -383,6 +393,23 @@ void gradientDescent_MiniBatch(){
         total_error = 0;
         epochs++;
     }
+}
+//-----------------------------------------GENERALISATION ABILITY--------------------------
+void  generalizationAbility(){
+    int i,real_category,final_category;
+    int correct_decision = 0;
+    int success;
+    for(i=0; i < TESTING_DATA; i++){
+        putInput(testing_data[i].x1, testing_data[i].x2);
+        forwardPass();
+        real_category = testing_data->c;
+        final_category = getCategory(layers[TOTAL_LAYERS -1].network->out_weights);
+        if(real_category == final_category){
+            correct_decision++;
+        }
+    }
+    success =  (float)(100 * correct_decision) / (float)TESTING_DATA;
+    printf("Generalization Ability: %%c", success);
 }
 //----------------------------------------EXIT-----------------------------------
 void exitProgramm(int exit_code){
