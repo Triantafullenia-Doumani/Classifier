@@ -20,6 +20,7 @@
 #define TESTING_DATA 5 // TODO-> change to 4000
 
 #define MIN_EPOCHS 700
+#define MAX_EPOCHS 1400
 
 /*About Batch sizes
 Small values give a learning process that converges quickly at the cost of noise in the training process.
@@ -73,15 +74,21 @@ struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
 
-int getCategory(float* vec){
-    int i;
+// We chose as output neuron the neuron with the max act value
+int getCategory(struct neuron *network){
+    int i, max_output = 0 ;
+    int category;
     for(i=0; i<K; i++){
-        if((int)vec[i] == 1){
-            return i+1;
+        if(network[i].actv > max_output ){
+            max_output = network[i].actv;
+            category = i;
         }
     }
-    printf("Category not found!");
-    return 0;
+    if(category == 0){
+        printf("Category could't find!");
+        return 0;
+    }
+    return category + 1;
 }
 int checkIfOutputLayer(int i){
     if(i < TOTAL_LAYERS -1){
@@ -90,13 +97,18 @@ int checkIfOutputLayer(int i){
 }
 //----------------------------------------EXIT-----------------------------------
 void exitProgramm(int exit_code){
+    int layer_size[TOTAL_LAYERS] = {d, H1_NEURONS, H2_NEURONS, H3_NEURONS, K};
     int i,j;
     for(i=0; i<TOTAL_LAYERS; i++){
         for(j=0; j<layers[i].neurons_num; j++){
-            free(layers[i].network[j].out_weights);
-            free(layers[i].network[j].d_out_weights);
+            if(!checkIfOutputLayer(i)){
+                free(layers[i].network[j].out_weights);
+                free(layers[i].network[j].d_out_weights);
+                layers[i].network[j].out_weights = NULL;  
+                layers[i].network[j].d_out_weights = NULL;          
+            }
         }
-        free(layers->network);
+        free(layers[i].network);
     }
     exit(exit_code);
 }
@@ -130,9 +142,11 @@ void initializeWeights(){
     for(i=0; i<TOTAL_LAYERS -1; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
             for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
-                layers[i].network[j].out_weights[k] = ((float)(rand() % 200) / (float)100) - 1; } } } // [-1,1]
+                layers[i].network[j].out_weights[k] = ((float)(rand() % 200) / (float)100) - 1;  // [-1,1]
                 layers[i].network[j].d_out_weights[k] = 0.0;
-
+            } 
+        } 
+    }                 
 }
 // Initialize biases for Layers: Hidden + Output
 // Input layer does not contain biases
@@ -153,7 +167,7 @@ int createArchitecture(){
     for(i=0; i<TOTAL_LAYERS; i++){
         layers[i] = initializeLayer(layer_size[i]);
         for(j=0; j<layer_size[i]; j++){
-            // output layer had only 1 weight, which is the final output
+            // output layer has only 1 weight, which is the final output
             if(!checkIfOutputLayer(i)){
                 layers[i].network[j] = initializeNeuron(layer_size[i+1]);
             }
@@ -322,13 +336,14 @@ void backPropagation(struct vector vector){
     backPropagationOutputLayer(vector);
     backPropagationHiddenLayers();
 }
-//----------------------------------UPDATE WEIGHTS---------------------------------
-void updateWeights(){
+//----------------------------------UPDATE WEIGHTS AND BIAS---------------------------------
+// Update weights and bias after a batch
+void update(){
     int i,k,j;
     for(i=0; i<TOTAL_LAYERS -1; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
             for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
-                layers[i].network[j].out_weights[k] -= LEARNING_RATE * layers[i].network[j].d_out_weights[k];
+                layers[i].network[j].out_weights[k] -= LEARNING_RATE * layers[i].network[j].d_out_weights[k]; //
             }
             layers[i].network[j].d_bias -= LEARNING_RATE * layers[i].network[j].d_bias;
         }
@@ -367,40 +382,52 @@ void printLayers(){
     }
 }
 //-----------------------------------------ERROR-------------------------------------
-float calculateError(struct vector vector){
+float calculateError(int* vec){
     float diff,error = 0;
     int i;
     for(i=0; i<K; i++){ // K = 3(num of categories)
-        diff = vector.vec[i] - layers[TOTAL_LAYERS -1].network[i].actv;
+        diff = vec[i] - layers[TOTAL_LAYERS -1].network[i].actv;
         error += (float)pow(diff,2);
     }
     error = ((float)0.5*error);
     return error;
 }
 //----------------------------------------Gradient Descent-------------------------------------
+void resetDerivatives(){ // NOT SURE IF NEEDED
+    int i,k,j;
+    for(i=0; i<TOTAL_LAYERS -1; i++){ 
+        for(j=0; j<layers[i].neurons_num; j++){ 
+            for(k=0; k<layers[i + 1].neurons_num; k++){ 
+                layers[i].network[j].out_weights[k] = 0.0;
+            }
+            layers[i].network[j].d_bias = 0.0;
+        }
+    }
+}
 void gradientDescent_MiniBatch(){
     int i,j;
     float total_error = 0;
     float prev_total_error = 0;
     int batch_size, epochs = 0;
-    while(1){
+    while(epochs < MAX_EPOCHS){
         for(i=0; i<TRAINING_DATA; i++){
             putInput(training_data[i].x1, training_data[i].x2);
             forwardPass();
-            total_error+= calculateError(training_data->vector);
+            total_error+= calculateError(training_data->vector.vec);
             backPropagation(training_data->vector);
             if(batch_size == BATCH_SIZE){
-                updateWeights();
+                update(); // update weights and biases
+                resetDerivatives(); // reset derivative weights and biases to 0
                 batch_size = 0;
             }else{
                 batch_size++;
             }
         }
-        printf("Total Error after training: %f",total_error);
+        printf("Epoch(%d): Total Error after training: %f\n",epochs+1,total_error);
         prev_total_error = total_error;
         if((epochs > MIN_EPOCHS) && ((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD)){
-            printf("Training completed!\nTotal error:%f", total_error);
-            exitProgramm(0);
+            printf("Training completed!\n");
+            break;
         }
         total_error = 0;
         epochs++;
@@ -415,13 +442,13 @@ void  generalizationAbility(){
         putInput(testing_data[i].x1, testing_data[i].x2);
         forwardPass();
         real_category = testing_data->c;
-        final_category = getCategory(layers[TOTAL_LAYERS -1].network->out_weights);
+        final_category = getCategory(layers[TOTAL_LAYERS -1].network);
         if(real_category == final_category){
             correct_decision++;
         }
     }
     success =  (float)(100 * correct_decision) / (float)TESTING_DATA;
-    printf("Generalization Ability: %f%c", success, 37);
+    printf("Generalization Ability: %.2f%c \n", success, '%');
 }
 
 //----------------------------------------MAIN--------------------------------------
@@ -430,8 +457,10 @@ void main(){
     loadDataset("testing_data.txt", testing_data, TESTING_DATA);
     createArchitecture();
     gradientDescent_MiniBatch();
-    printLayers();
-    printDataset("Training data",training_data,TRAINING_DATA);
+    generalizationAbility();
+    exitProgramm(0);
+    //printLayers();
+    //printDataset("Training data",training_data,TRAINING_DATA);
     //printDataset("Testing data",testing_data,TESTING_DATA);
     //createTestingDataset()
     //createTrainingDataset
