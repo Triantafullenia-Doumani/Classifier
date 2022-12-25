@@ -448,7 +448,7 @@ void  generalizationAbility(){
         }
     }
     success =  (float)(100 * correct_decision) / (float)TESTING_DATA;
-    printf("Generalization Ability: %.2f%c \n", success, '%');
+    printf("Generalization Ability = %.2f%c \n", success, '%');
 }
 
 //----------------------------------------MAIN--------------------------------------
