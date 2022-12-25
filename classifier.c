@@ -11,16 +11,16 @@
 #define H1_NEURONS 6
 #define H2_NEURONS 4
 #define H3_NEURONS 2
-#define ACTIVATION_FUNCTION 1 //0 for "tanh", 1 for "relu"
+#define ACTIVATION_FUNCTION 0 //0 for "tanh", 1 for "relu"
 
 #define LEARNING_RATE 0.15
-#define EXIT_THRESHOLD 0.01
+#define ERROR_THRESHOLD 0.01
 
 #define TRAINING_DATA 4000 // TODO-> change to 4000
 #define TESTING_DATA 4000 // TODO-> change to 4000
 
 #define MIN_EPOCHS 700
-#define MAX_EPOCHS 1400
+#define MAX_EPOCHS 5000
 
 /*About Batch sizes
 Small values give a learning process that converges quickly at the cost of noise in the training process.
@@ -447,7 +447,7 @@ void resetDerivatives(){ // NOT SURE IF NEEDED
     }
 }
 void gradientDescent_MiniBatch(){
-    printf("\nTraining in progress...\nWe are using Mini Batch Gradient Descent with \n\tLearning Rate: %.2f\n\tExit Threshold: %.2f\n\tBatch size: %d\n",LEARNING_RATE,EXIT_THRESHOLD,BATCH_SIZE);
+    printf("\nTraining in progress...\nWe are using Mini Batch Gradient Descent with \n\tLearning Rate: %.2f\n\tError Threshold: %.2f\n\tBatch size: %d\n",LEARNING_RATE,ERROR_THRESHOLD,BATCH_SIZE);
     FILE * fPtr = fopen("Total_erros", "w");
     int i,j;
     float total_error;
@@ -469,14 +469,16 @@ void gradientDescent_MiniBatch(){
             }
         }
         fprintf(fPtr,"Epoch(%d): Total Error: %f\n",epochs+1,total_error);
-        if((epochs > MIN_EPOCHS) && ((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD)){
+        if((epochs > MIN_EPOCHS) && ((float)fabs(total_error - prev_total_error) < (float)ERROR_THRESHOLD)){
             printf("Training completed!\n");
-            break;
+            fclose(fPtr);
+            return;
         }
         prev_total_error = total_error;
         epochs++;
     }
     fclose(fPtr);
+    printf("MAX epochs(%d)! End of Training",MAX_EPOCHS);
 }
 //-----------------------------------------GENERALISATION ABILITY--------------------------
 void  generalizationAbility(){
