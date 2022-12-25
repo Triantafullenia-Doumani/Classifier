@@ -76,11 +76,11 @@ struct neuron initializeNeuron(int out_weights_number){
     struct neuron neuron;
     if(!(neuron.out_weights = (float*) malloc(out_weights_number * sizeof(float)))){
         printf("Initialize neuron failed");
-        exit(2);
+        exitProgramm(3);
     }
     if(!(neuron.d_out_weights = (float*) malloc(out_weights_number * sizeof(float)))){
         printf("Initialize neuron failed");
-        exit(2);
+        exitProgramm(3);
     }
     return neuron;
 }
@@ -92,7 +92,7 @@ struct layer initializeLayer(int layer_size){
         return layer;
     }
     printf("Initialize layer failed.");
-    exit(3);
+    exitProgramm(4);
 }
 
 // Initialize random weights for Layers: Input + Hidden
@@ -169,7 +169,7 @@ void loadDataset(char *filename,struct data *dataset, int dataset_size){
     if ((fptr = fopen(filename,"r")) == NULL){
         printf("Error! opening file");
         // Program exits if the file pointer returns NULL.
-        exit(0);
+        exitProgramm(1);
     }
     // reading line by line
     i = 0;
@@ -177,7 +177,7 @@ void loadDataset(char *filename,struct data *dataset, int dataset_size){
         data = createDataStruct(buffer);
         if(i > dataset_size){
             printf("'%s': File size is bigger than expected:(%d)",filename,dataset_size);
-            exit(1);
+            exitProgramm(2);
         }
         dataset[i].x1 = data.x1;
         dataset[i].x2 = data.x2;
@@ -365,8 +365,21 @@ void gradientDescent(){
         prev_total_error = total_error;
         if((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD){
             printf("Training completed!\nTotal error:%f", total_error);
+            exitProgramm(0);
         }
     }
+}
+//----------------------------------------EXIT-----------------------------------
+void exitProgramm(int exit_code){
+    int i,j;
+    for(i=0; i<TOTAL_LAYERS; i++){
+        for(j=0; j<layers[i].neurons_num; j++){
+            free(layers[i].network[j].out_weights);
+            free(layers[i].network[j].d_out_weights);
+        }
+        free(layers->network);
+    }
+    exit(exit_code);
 }
 //----------------------------------------MAIN--------------------------------------
 void main(){
