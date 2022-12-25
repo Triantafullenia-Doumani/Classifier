@@ -73,10 +73,10 @@ struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
 
-int getCategory(int* vec){
+int getCategory(float* vec){
     int i;
     for(i=0; i<K; i++){
-        if(vec[i] == 1){
+        if((int)vec[i] == 1){
             return i+1;
         }
     }
@@ -87,6 +87,18 @@ int checkIfOutputLayer(int i){
     if(i < TOTAL_LAYERS -1){
         return 0; 
     }return 1; // Output Layer 
+}
+//----------------------------------------EXIT-----------------------------------
+void exitProgramm(int exit_code){
+    int i,j;
+    for(i=0; i<TOTAL_LAYERS; i++){
+        for(j=0; j<layers[i].neurons_num; j++){
+            free(layers[i].network[j].out_weights);
+            free(layers[i].network[j].d_out_weights);
+        }
+        free(layers->network);
+    }
+    exit(exit_code);
 }
 //----------------------------------CREATE ARCHITECTURE-----------------------------------------------------------------------
 struct neuron initializeNeuron(int out_weights_number){
@@ -398,7 +410,7 @@ void gradientDescent_MiniBatch(){
 void  generalizationAbility(){
     int i,real_category,final_category;
     int correct_decision = 0;
-    int success;
+    float success;
     for(i=0; i < TESTING_DATA; i++){
         putInput(testing_data[i].x1, testing_data[i].x2);
         forwardPass();
@@ -409,26 +421,15 @@ void  generalizationAbility(){
         }
     }
     success =  (float)(100 * correct_decision) / (float)TESTING_DATA;
-    printf("Generalization Ability: %%c", success);
+    printf("Generalization Ability: %f%c", success, 37);
 }
-//----------------------------------------EXIT-----------------------------------
-void exitProgramm(int exit_code){
-    int i,j;
-    for(i=0; i<TOTAL_LAYERS; i++){
-        for(j=0; j<layers[i].neurons_num; j++){
-            free(layers[i].network[j].out_weights);
-            free(layers[i].network[j].d_out_weights);
-        }
-        free(layers->network);
-    }
-    exit(exit_code);
-}
+
 //----------------------------------------MAIN--------------------------------------
 void main(){
     loadDataset("training_data.txt", training_data, TRAINING_DATA);
     loadDataset("testing_data.txt", testing_data, TESTING_DATA);
     createArchitecture();
-    gradientDescent();
+    gradientDescent_MiniBatch();
     printLayers();
     printDataset("Training data",training_data,TRAINING_DATA);
     //printDataset("Testing data",testing_data,TESTING_DATA);
