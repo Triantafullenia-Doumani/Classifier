@@ -16,8 +16,8 @@
 #define LEARNING_RATE 0.15
 #define EXIT_THRESHOLD 0.01
 
-#define TRAINING_DATA 5 // TODO-> change to 4000
-#define TESTING_DATA 5 // TODO-> change to 4000
+#define TRAINING_DATA 4000 // TODO-> change to 4000
+#define TESTING_DATA 4000 // TODO-> change to 4000
 
 #define MIN_EPOCHS 700
 #define MAX_EPOCHS 1400
@@ -138,6 +138,7 @@ struct layer initializeLayer(int layer_size){
 
 // Initialize random weights for Layers: Input + Hidden
 void initializeWeights(){
+    printf("\nIntintialize Weights...\n");
     int i,k,j;
     for(i=0; i<TOTAL_LAYERS -1; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
@@ -151,6 +152,7 @@ void initializeWeights(){
 // Initialize biases for Layers: Hidden + Output
 // Input layer does not contain biases
 void initializeBiases(){
+    printf("Intintialize Biases...\n");
     int i,j;
     for(i=1; i<TOTAL_LAYERS; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
@@ -164,6 +166,7 @@ Initialize biases
 int createArchitecture(){
     int layer_size[TOTAL_LAYERS] = {d, H1_NEURONS, H2_NEURONS, H3_NEURONS, K};
     int i,j;
+    printf("Created Layers: %d\n",TOTAL_LAYERS);
     for(i=0; i<TOTAL_LAYERS; i++){
         layers[i] = initializeLayer(layer_size[i]);
         for(j=0; j<layer_size[i]; j++){
@@ -172,8 +175,8 @@ int createArchitecture(){
                 layers[i].network[j] = initializeNeuron(layer_size[i+1]);
             }
         }
+        printf("Layer:%d (%d neurons)\n", i, layer_size[i]);
     }
-    printf("Created Layers: %d\n",TOTAL_LAYERS);
     initializeWeights();
     initializeBiases();
 }
@@ -361,25 +364,42 @@ void printDataset(char *dataset_name, struct data *dataset, int dataset_size){
         printf(")\n");
     }
 }
-
-void printLayers(){
+void printMPLnetwork(char *filename){
+    FILE * fPtr = fopen(filename, "w");
+    if(fPtr == NULL)
+    {
+        /* File not created hence exit */
+        printf("Unable to create file.\n");
+        exit(6);
+    }
     int i,j,k;
     int out_weights_size;
     for(i=0; i<TOTAL_LAYERS; i++){
-        printf("\nLAYER: %d\nNEURONS: %d\n", i, layers[i].neurons_num);
+        fprintf(fPtr,"\nLAYER: %d\nNEURONS: %d\n", i, layers[i].neurons_num);
         for(j=0; j<layers[i].neurons_num; j++){
             
-            printf("(neuron %d) ",j);
-            printf("BIAS: %f ",layers[i].network[j].bias);
+            fprintf(fPtr,"(neuron %d)\n",j);
+            if(i!= 0 ){
+                fprintf(fPtr,"\tBIAS: %f\n",layers[i].network[j].bias);
+            }
+            fprintf(fPtr,"\tVALUE: %f\n\tACTV: %f\n",layers[i].network[j].value,layers[i].network[j].actv);
             if( i < TOTAL_LAYERS -1){    
                 out_weights_size = sizeof(layers[i].network[j].out_weights)/sizeof(layers[i].network[j].out_weights[0]);
-                printf("WEIGHTS: ");
+                fprintf(fPtr,"\tWEIGHTS: ");
                 for(k=0; k<out_weights_size; k++){
-                    printf("%f ",layers[i].network[j].out_weights[k]);
+                    fprintf(fPtr,"%f ",layers[i].network[j].out_weights[k]);
                 }
-            }printf("\n");
+            }
+            fprintf(fPtr,"\n\n\tD_BIAS: %f\n\tD_VALUE: %f\n\tD_ACTV: %f\n",layers[i].network[j].d_bias, layers[i].network[j].d_value,layers[i].network[j].d_actv);
+            if( i < TOTAL_LAYERS -1){    
+                fprintf(fPtr,"\tD_WEIGHTS: ");
+                for(k=0; k<out_weights_size; k++){
+                    fprintf(fPtr,"%f ",layers[i].network[j].d_out_weights[k]);
+                }
+            }fprintf(fPtr,"\n");
         }
     }
+    fclose(fPtr);
 }
 //-----------------------------------------ERROR-------------------------------------
 float calculateError(int* vec){
@@ -405,6 +425,8 @@ void resetDerivatives(){ // NOT SURE IF NEEDED
     }
 }
 void gradientDescent_MiniBatch(){
+    printf("\nTraining in progress...\nWe are using Mini Batch Gradient Descent with \n\tLearning Rate: %.2f\n\tExit Threshold: %.2f\n\tBatch size: %d\n",LEARNING_RATE,EXIT_THRESHOLD,BATCH_SIZE);
+    FILE * fPtr = fopen("Total_erros", "w");
     int i,j;
     float total_error = 0;
     float prev_total_error = 0;
@@ -423,15 +445,16 @@ void gradientDescent_MiniBatch(){
                 batch_size++;
             }
         }
-        printf("Epoch(%d): Total Error after training: %f\n",epochs+1,total_error);
-        prev_total_error = total_error;
+        fprintf(fPtr,"Epoch(%d): Total Error after training: %f\n",epochs+1,total_error);
         if((epochs > MIN_EPOCHS) && ((float)fabs(total_error - prev_total_error) < (float)EXIT_THRESHOLD)){
             printf("Training completed!\n");
             break;
         }
+        prev_total_error = total_error;
         total_error = 0;
         epochs++;
     }
+    fclose(fPtr);
 }
 //-----------------------------------------GENERALISATION ABILITY--------------------------
 void  generalizationAbility(){
@@ -448,7 +471,7 @@ void  generalizationAbility(){
         }
     }
     success =  (float)(100 * correct_decision) / (float)TESTING_DATA;
-    printf("Generalization Ability = %.2f%c \n", success, '%');
+    printf("\nGeneralization Ability = %.2f%c \n", success, '%');
 }
 
 //----------------------------------------MAIN--------------------------------------
@@ -456,14 +479,13 @@ void main(){
     loadDataset("training_data.txt", training_data, TRAINING_DATA);
     loadDataset("testing_data.txt", testing_data, TESTING_DATA);
     createArchitecture();
+    printMPLnetwork("MPL_architecture.txt");
     gradientDescent_MiniBatch();
     generalizationAbility();
-    exitProgramm(0);
-    //printLayers();
+    printMPLnetwork("MPL_after_training.txt");
     //printDataset("Training data",training_data,TRAINING_DATA);
     //printDataset("Testing data",testing_data,TESTING_DATA);
-    //createTestingDataset()
-    //createTrainingDataset
+    exitProgramm(0);
 }
 
 /*
