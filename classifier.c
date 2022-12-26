@@ -16,8 +16,8 @@
 #define LEARNING_RATE 0.15
 #define ERROR_THRESHOLD 0.01
 
-#define TRAINING_DATA 4000 // TODO-> change to 4000
-#define TESTING_DATA 4000 // TODO-> change to 4000
+#define TRAINING_DATA 4000
+#define TESTING_DATA 4000 
 
 #define MIN_EPOCHS 700
 #define MAX_EPOCHS 5000
@@ -35,7 +35,7 @@ C1 -> (1,0,0)
 C2 -> (0,1,0)
 C3 -> (0,0,1) 
 
-We will use later to calculate the total error because here we will store the correct output.
+We will use it to calculate the total error because here we will store the correct output.
 */
 struct vector{
     int vec[K];
@@ -43,23 +43,23 @@ struct vector{
 
 // Struct for each set of x1,x2,c(category)
 struct data {
-	float x1;
-	float x2;
+	float x1; // input1
+	float x2; // input2
 	int c; //category
     struct vector vector;
 };
 
 // MPL neuron
 struct neuron{
-    float *out_weights;
-    float bias; // polwsh 
-    float value; // value of neuron each moment
-    float actv; // the value of the neuron after the act function
+    float *out_weights; // Weights of neuron towards the neurons of the next layer
+    float bias; //  Helps the model to shift the activation function towards the positive or negative side.
+    float value; // Value of neuron each moment = Total input(x1*w1+ x2*w2+...+xn*wn + bias)
+    float actv_value; // Activated value: Value of the neuron after the activation function(activation_function(value))
 
     float *d_out_weights; // derivative of weights 
     float d_bias; //derivative of bias 
     float d_value; // derivative of value
-    float d_actv; // derivative of act 
+    float d_actv_value; // derivative of activated value
 };
 
 // All layers of the MultiLayer Perceptron(MPL)
@@ -76,11 +76,11 @@ struct layer layers[TOTAL_LAYERS];
 
 // We chose as output neuron the neuron with the max act value
 int getCategory(struct neuron *network){
-    int i, max_actv = network[0].actv ;
+    int i, max_actv_value = network[0].actv_value ;
     int category = 0;
     for(i=1; i<K; i++){
-        if(network[i].actv > max_actv ){
-            max_actv = network[i].actv;
+        if(network[i].actv_value > max_actv_value ){
+            max_actv_value = network[i].actv_value;
             category = i;
         }
     }
@@ -232,28 +232,28 @@ void loadDataset(char *filename,struct data *dataset, int dataset_size){
 }
 //----------------------------------FORWARD PASS------------------------------------
 void putInput(float x1, float x2){
-    layers[0].network[0].actv =  x1;
-    layers[0].network[1].actv =  x2;
+    layers[0].network[0].actv_value =  x1;
+    layers[0].network[1].actv_value =  x2;
 
     layers[0].network[0].value =  x1;
     layers[0].network[0].value =  x2;
 }
 void relu(int layer, int neuron){
     if(layers[layer].network[neuron].value < 0){
-        layers[layer].network[neuron].actv = 0;
+        layers[layer].network[neuron].actv_value = 0;
     }else{
-        layers[layer].network[neuron].actv = layers[layer].network[neuron].value;
+        layers[layer].network[neuron].actv_value = layers[layer].network[neuron].value;
     }
 }
 void tahn(int layer, int neuron){
     float x = layers[layer].network[neuron].value;
     float tahn_result =  ((float)exp(x) - (float)exp(-x)) / (float)(exp(x) + (float)exp(-x));
-    layers[layer].network[neuron].actv = tahn_result;
+    layers[layer].network[neuron].actv_value = tahn_result;
 }
 void sigmoid(int layer, int neuron){
     float x = layers[layer].network[neuron].value;
     float sigmoid_result = (float)1.0/((float)1.0+(float)exp(-(x)));
-    layers[layer].network[neuron].actv = sigmoid_result;
+    layers[layer].network[neuron].actv_value = sigmoid_result;
 }
 void activationFunction(int layer, int neuron){
     if(!checkIfOutputLayer(layer)){ // Hidded Layer
@@ -271,7 +271,7 @@ void activationFunction(int layer, int neuron){
 void forwardPass(){
     int i,j,k;
     float prev_out_weight;
-    float prev_actv;
+    float prev_actv_value;
     int act_fun;
     int sum = 0;
     for(i=1; i<TOTAL_LAYERS; i++){
@@ -279,11 +279,11 @@ void forwardPass(){
             layers[i].network[j].value = layers[i].network[j].bias;
 
             for(k=0; k<layers[i-1].neurons_num; k++){
-                prev_actv       = layers[i-1].network[k].actv;
+                prev_actv_value       = layers[i-1].network[k].actv_value;
                 prev_out_weight = layers[i-1].network[k].out_weights[j];
 
-                layers[i].network[j].value +=  prev_actv * prev_out_weight;
-                // Now we need to use the activation function to update the 'actv' value
+                layers[i].network[j].value +=  prev_actv_value * prev_out_weight;
+                // Now we need to use the activation function to update the 'actv_value'
                 activationFunction(i,j);
             }
         }
@@ -294,39 +294,39 @@ void forwardPass(){
 // back propagation for Output Layer
 void backPropagationOutputLayer(struct vector vector){
     int i,k;
-    float actv,d_value;
-    float prev_actv, prev_weight; // act and weight of a neuron of the previous layer
+    float actv_value,d_value;
+    float prev_actv_value, prev_weight; // act and weight of a neuron of the previous layer
     float correct_out;
 
     for(i=0; i<K; i++){
-        actv = layers[TOTAL_LAYERS - 1].network[i].actv;
+        actv_value = layers[TOTAL_LAYERS - 1].network[i].actv_value;
         correct_out = vector.vec[i];
-        layers[TOTAL_LAYERS -1].network[i].d_value = actv - correct_out*actv*(1 - actv);
+        layers[TOTAL_LAYERS -1].network[i].d_value = actv_value - correct_out*actv_value*(1 - actv_value);
 
         for(k=0; k<H3_NEURONS; k++){
-            prev_actv = layers[TOTAL_LAYERS-2].network[k].actv;
+            prev_actv_value = layers[TOTAL_LAYERS-2].network[k].actv_value;
             d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
-            layers[TOTAL_LAYERS-2].network[k].d_out_weights[i] = prev_actv * d_value;
+            layers[TOTAL_LAYERS-2].network[k].d_out_weights[i] = prev_actv_value * d_value;
             
             // *** Not sure if needed!****!!!!!!!!!!!!!!!!!
             prev_weight = layers[TOTAL_LAYERS-2].network[k].out_weights[i];
-            layers[TOTAL_LAYERS-2].network[k].d_actv = prev_weight * d_value;
+            layers[TOTAL_LAYERS-2].network[k].d_actv_value = prev_weight * d_value;
         }
         layers[TOTAL_LAYERS-1].network[i].d_bias = d_value;
     }
 }
 void d_relu(int layer, int neuron){
-    if(layers[layer].network[neuron].actv < 0){
+    if(layers[layer].network[neuron].actv_value < 0){
         layers[layer].network[neuron].d_value = 0;
     }else{
-        layers[layer].network[neuron].d_value = layers[layer].network[neuron].d_actv;
+        layers[layer].network[neuron].d_value = layers[layer].network[neuron].d_actv_value;
     }
 }
 void d_tahn(int layer, int neuron){
-    float actv = layers[layer].network[neuron].actv;
-    float d_actv = layers[layer].network[neuron].d_actv;
-    float d_tahn_result = (float)((float)1.0 - pow(actv, 2));
-    layers[layer].network[neuron].d_value = d_tahn_result * d_actv;
+    float actv_value = layers[layer].network[neuron].actv_value;
+    float d_actv_value = layers[layer].network[neuron].d_actv_value;
+    float d_tahn_result = (float)((float)1.0 - pow(actv_value, 2));
+    layers[layer].network[neuron].d_value = d_tahn_result * d_actv_value;
 }
 void d_activationFunction(int layer, int neuron){
     if(ACTIVATION_FUNCTION == 0 ){ 
@@ -340,13 +340,13 @@ void backPropagationHiddenLayers(){
     int i,j,k,l;
     for(i=TOTAL_LAYERS -2; i>0; i--){
         for(j=0;j<layers[i].neurons_num; j++){
-            //layers[i].network[j].d_actv = 0.0;
+            //layers[i].network[j].d_actv_value = 0.0;
             d_activationFunction(i,j);
 
             for(k=0; k<layers[i-1].neurons_num; k++){
-                layers[i-1].network[k].d_out_weights[j] = layers[i].network[j].d_value * layers[i-1].network[k].actv;
+                layers[i-1].network[k].d_out_weights[j] = layers[i].network[j].d_value * layers[i-1].network[k].actv_value;
                 if(i>1){
-                    layers[i-1].network[k].d_actv = layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
+                    layers[i-1].network[k].d_actv_value = layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
                 }
             }
             layers[i].network[j].d_bias = layers[i].network[j].d_value;
@@ -401,7 +401,7 @@ void printMPLnetwork(char *filename){
             if(i!= 0 ){
                 fprintf(fPtr,"\tBIAS: %f\n",layers[i].network[j].bias);
             }
-            fprintf(fPtr,"\tVALUE: %f\n\tACTV: %f\n",layers[i].network[j].value,layers[i].network[j].actv);
+            fprintf(fPtr,"\tVALUE: %f\n\tACTV: %f\n",layers[i].network[j].value,layers[i].network[j].actv_value);
             if( i < TOTAL_LAYERS -1){    
                 out_weights_size = layer_size[i+1];
                 fprintf(fPtr,"\tWEIGHTS: ");
@@ -409,7 +409,7 @@ void printMPLnetwork(char *filename){
                     fprintf(fPtr,"%f ",layers[i].network[j].out_weights[k]);
                 }
             }
-            fprintf(fPtr,"\n\n\tD_BIAS: %f\n\tD_VALUE: %f\n\tD_ACTV: %f\n",layers[i].network[j].d_bias, layers[i].network[j].d_value,layers[i].network[j].d_actv);
+            fprintf(fPtr,"\n\n\tD_BIAS: %f\n\tD_VALUE: %f\n\tD_ACTV: %f\n",layers[i].network[j].d_bias, layers[i].network[j].d_value,layers[i].network[j].d_actv_value);
             if( i < TOTAL_LAYERS -1){    
                 fprintf(fPtr,"\tD_WEIGHTS: ");
                 for(k=0; k<out_weights_size; k++){
@@ -425,7 +425,7 @@ float calculateError(int* vec){
     float diff,error = 0;
     int i;
     for(i=0; i<K; i++){ // K = 3(num of categories)
-        diff = vec[i] - layers[TOTAL_LAYERS -1].network[i].actv; 
+        diff = vec[i] - layers[TOTAL_LAYERS -1].network[i].actv_value; 
         error += (float)pow(diff,2);
     }
     error = ((float)0.5*error);
@@ -511,18 +511,3 @@ void main(){
     //printDataset("Testing data",testing_data,TESTING_DATA);
     exitProgramm(0);
 }
-
-/*
-1) Why Initialize a Neural Network with Random Weights? https://machinelearningmastery.com/why-initialize-a-neural-network-with-random-weights/
-
-2) How does the bias works in Neural Networks? 
-Bias can be considered as an additional set of weights in a model that doesn’t need any input, and related to the output of the model when it has no inputs.
-Adding a constant to the input bias allows to shift the activation function. 
-There, a bias works exactly the same way it does in a linear equation:
-
-bias = mx + c
-
-In a scenario with bias, the input to the activation function is 'x' times the connection weight 'w0' plus the bias times the connection weight for the bias 'w1'. This has the effect of shifting the activation function by a constant amount (b * w1).
-
-3)forward-pass https://www.google.com/search?q=forward-pass+in+neural+network&source=lnms&tbm=vid&sa=X&ved=2ahUKEwiRgMb2lon8AhUoS_EDHd4bCJoQ_AUoAnoECAEQBA&biw=768&bih=702&dpr=1.25#fpstate=ive&vld=cid:ea47a04d,vid:UJwK6jAStmg
-*/
