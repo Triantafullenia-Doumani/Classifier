@@ -11,7 +11,7 @@
 #define H1_NEURONS 6
 #define H2_NEURONS 4
 #define H3_NEURONS 2
-#define ACTIVATION_FUNCTION 0 //0 for "tanh", 1 for "relu"
+#define ACTIVATION_FUNCTION 0 //0 for "tanh", 1 for "relu", 2 for "logistic"
 
 #define LEARNING_RATE 0.15
 #define ERROR_THRESHOLD 0.01
@@ -74,6 +74,13 @@ struct data testing_data[TESTING_DATA];
 
 struct layer layers[TOTAL_LAYERS];
 
+char* getActvFunction(){
+    if(ACTIVATION_FUNCTION == 0){
+        return "Tanh";
+    }else{
+        return "Relu";
+    }
+}
 // We chose as output neuron the neuron with the max act value
 int getCategory(struct neuron *network){
     int i, max_actv_value = network[0].actv_value ;
@@ -238,6 +245,7 @@ void putInput(float x1, float x2){
     layers[0].network[0].value =  x1;
     layers[0].network[0].value =  x2;
 }
+// Activation function:relu. Used in Hidden layers.
 void relu(int layer, int neuron){
     if(layers[layer].network[neuron].value < 0){
         layers[layer].network[neuron].actv_value = 0;
@@ -245,26 +253,36 @@ void relu(int layer, int neuron){
         layers[layer].network[neuron].actv_value = layers[layer].network[neuron].value;
     }
 }
+// Activation function:tahn. Used in Hidden layers.
 void tahn(int layer, int neuron){
     float x = layers[layer].network[neuron].value;
     float tahn_result =  ((float)exp(x) - (float)exp(-x)) / (float)(exp(x) + (float)exp(-x));
     layers[layer].network[neuron].actv_value = tahn_result;
 }
-void sigmoid(int layer, int neuron){
+
+/* 
+Activation function:logistic(or sigmoid) 
+*/
+void logistic(int layer, int neuron){
     float x = layers[layer].network[neuron].value;
-    float sigmoid_result = (float)1.0/((float)1.0+(float)exp(-(x)));
-    layers[layer].network[neuron].actv_value = sigmoid_result;
+    float logistic_result = (float)1.0/((float)1.0+(float)exp(-(x)));
+    layers[layer].network[neuron].actv_value = logistic_result;
 }
 void activationFunction(int layer, int neuron){
-    if(!checkIfOutputLayer(layer)){ // Hidded Layer
+    if(!checkIfOutputLayer(layer)){ // Hidded Layers
         if(ACTIVATION_FUNCTION == 0 ){ 
             tahn(layer,neuron);
         }
-        else{                         
+        else if(ACTIVATION_FUNCTION == 1 ){                         
             relu(layer,neuron);
+        }else if(ACTIVATION_FUNCTION == 2 ){
+            logistic(layer,neuron);
+        }else{
+            printf("Unkown Activation function!");
+            exitProgramm(6);
         }
     }else{                         // Output Layer
-        sigmoid(layer,neuron);
+        logistic(layer,neuron);
     }
 }
 
@@ -283,7 +301,7 @@ void forwardPass(){
                 prev_out_weight = layers[i-1].network[k].out_weights[j];
 
                 layers[i].network[j].value +=  prev_actv_value * prev_out_weight;
-                // Now we need to use the activation function to update the 'actv_value'
+                // Use of the activation function to calculate the activated value('actv_value')
                 activationFunction(i,j);
             }
         }
@@ -323,17 +341,26 @@ void d_relu(int layer, int neuron){
     }
 }
 void d_tahn(int layer, int neuron){
-    float actv_value = layers[layer].network[neuron].actv_value;
+    float x = layers[layer].network[neuron].actv_value;
+    float d_tahn_result = (float)((float)1.0 - pow(x, 2));
+
     float d_actv_value = layers[layer].network[neuron].d_actv_value;
-    float d_tahn_result = (float)((float)1.0 - pow(actv_value, 2));
     layers[layer].network[neuron].d_value = d_tahn_result * d_actv_value;
+}
+void d_logistic(int layer, int neuron){
+    float actv_value = layers[layer].network[neuron].actv_value;
+    layers[layer].network[neuron].d_value = (float)actv_value*(1 - actv_value);
 }
 void d_activationFunction(int layer, int neuron){
     if(ACTIVATION_FUNCTION == 0 ){ 
         d_tahn(layer,neuron);
-    }
-    else{                         
+    }else if(ACTIVATION_FUNCTION == 1 ){                         
         d_relu(layer,neuron);
+    }else if(ACTIVATION_FUNCTION == 2 ){
+        d_logistic(layer,neuron);
+    }else{
+        printf("Unkown Activation function!");
+        exitProgramm(6);
     }
 }
 void backPropagationHiddenLayers(){
@@ -389,7 +416,7 @@ void printMPLnetwork(char *filename){
     {
         /* File not created hence exit */
         printf("Unable to create file.\n");
-        exit(6);
+        exitProgramm(5);
     }
     int i,j,k;
     int out_weights_size;
@@ -447,7 +474,7 @@ void resetDerivatives(){ // NOT SURE IF NEEDED
     }
 }
 void gradientDescent_MiniBatch(){
-    printf("\nTraining in progress...\nWe are using Mini Batch Gradient Descent with \n\tLearning Rate: %.2f\n\tError Threshold: %.2f\n\tBatch size: %d\n",LEARNING_RATE,ERROR_THRESHOLD,BATCH_SIZE);
+    printf("\nTraining in progress...\nWe are using Mini Batch Gradient Descent with \n\tLearning Rate: %.2f\n\tError Threshold: %.2f\n\tBatch size: %d\n\tActivation Function: %s\n",LEARNING_RATE,ERROR_THRESHOLD,BATCH_SIZE,getActvFunction());
     FILE * fPtr = fopen("Total_erros", "w");
     int i,j;
     float total_error;
@@ -478,7 +505,7 @@ void gradientDescent_MiniBatch(){
         epochs++;
     }
     fclose(fPtr);
-    printf("MAX epochs(%d)! End of Training",MAX_EPOCHS);
+    printf("Warning! End of Training due to convergence failure\nMAX epochs: %d",MAX_EPOCHS);
 }
 //-----------------------------------------GENERALISATION ABILITY--------------------------
 void  generalizationAbility(){
