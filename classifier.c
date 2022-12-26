@@ -8,25 +8,25 @@
 #define TOTAL_LAYERS 5
 #define d 2 // x1 x2
 #define K 3 // Number of categories
-#define H1_NEURONS 6
-#define H2_NEURONS 4
-#define H3_NEURONS 2
-#define ACTIVATION_FUNCTION 2 //0 for "tanh", 1 for "relu", 2 for "logistic"
+#define H1_NEURONS 3
+#define H2_NEURONS 2
+#define H3_NEURONS 5
+#define ACTIVATION_FUNCTION 1 //0 for "tanh", 1 for "relu", 2 for "logistic"
 
-#define LEARNING_RATE 0.15
+#define LEARNING_RATE 0.001
 #define ERROR_THRESHOLD 0.01
 
 #define TRAINING_DATA 4000
 #define TESTING_DATA 4000 
 
 #define MIN_EPOCHS 700
-#define MAX_EPOCHS 5000
+#define MAX_EPOCHS 1000
 
 /*About Batch sizes
 Small values give a learning process that converges quickly at the cost of noise in the training process.
 Large values give a learning process that converges slowly with accurate estimates of the error gradient.
 */
-#define BATCH_SIZE 40 // TRAINING_DATA/10=400 or TRAINING_DATA/100=40
+#define BATCH_SIZE 400 // TRAINING_DATA/10=400 or TRAINING_DATA/100=40
 
 
 /* 
@@ -36,13 +36,11 @@ e.g.
 C1 -> (1,0,0)
 C2 -> (0,1,0)
 C3 -> (0,0,1) 
-
-We will use it to calculate the total error because here we will store the correct output.
 */ 
 struct data {
 	float x1; // input1
 	float x2; // input2
-    int vec[K]; // vector 
+    int vec[K]; // Output 
 };
 
 // MPL neuron
@@ -82,15 +80,16 @@ char* getActvFunction(){
 // We chose as output neuron the neuron with the max act_value
 int getOutputNeuron(){
     int i; 
-    int max_actv_value = layers[TOTAL_LAYERS -1].network[0].actv_value ;
+    float max_actv_value = layers[TOTAL_LAYERS -1].network[0].actv_value;
     int category = 0;
     for(i=1; i<K; i++){
         if(layers[TOTAL_LAYERS -1].network[i].actv_value > max_actv_value ){
-            max_actv_value =layers[TOTAL_LAYERS -1].network[i].actv_value;
+            max_actv_value = layers[TOTAL_LAYERS -1].network[i].actv_value;
             category = i;
         }
     }
-    return category;
+    //printf("c:%d ", category);
+    return category; // FIX returns always 2!
 }
 // Check if Output neuron after training is the one expected
 int isCorrect(int *vec){
@@ -128,10 +127,17 @@ struct neuron initializeNeuron(int out_weights_number){
         printf("Initialize neuron failed");
         exitProgramm(3);
     }
+    neuron.bias = 0.0;
+    neuron.value = 0.0;
+    neuron.actv_value = 0.0;
+
     if(!(neuron.d_out_weights = (float*) malloc(out_weights_number * sizeof(float)))){
         printf("Initialize neuron failed");
         exitProgramm(3);
     }
+    neuron.d_bias = 0.0;
+    neuron.d_value = 0.0;
+    neuron.d_actv_value = 0.0;
     return neuron;
 }
 
@@ -153,6 +159,7 @@ void initializeWeights(){
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
             for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
                 layers[i].network[j].out_weights[k] = ((float)(rand() % 200) / (float)100) - 1;  // [-1,1]
+                layers[i].network[j].d_out_weights[k] = 0.0;
             } 
         } 
     }                 
@@ -265,13 +272,15 @@ void tahn(int layer, int neuron){
 }
 
 /* 
-Activation function:logistic(or sigmoid) 
+Activation function:logistic(or sigmoid). Used in Output & Hidden Layers.
+We have a Multiclass Classification Problem(3 categories), that is why we use Logistic activation function for Output layer
 */
 void logistic(int layer, int neuron){
     float x = layers[layer].network[neuron].value;
     float logistic_result = (float)1.0/((float)1.0+(float)exp(-(x)));
     layers[layer].network[neuron].actv_value = logistic_result;
 }
+
 void activationFunction(int layer, int neuron){
     if(!checkIfOutputLayer(layer)){ // Hidded Layers
         if(ACTIVATION_FUNCTION == 0 ){ 
@@ -286,7 +295,7 @@ void activationFunction(int layer, int neuron){
             exitProgramm(6);
         }
     }else{                         // Output Layer
-        logistic(layer,neuron);
+        logistic(TOTAL_LAYERS-1,neuron);
     }
 }
 
@@ -301,42 +310,18 @@ void forwardPass(){
             layers[i].network[j].value = layers[i].network[j].bias;
 
             for(k=0; k<layers[i-1].neurons_num; k++){
-                prev_actv_value       = layers[i-1].network[k].actv_value;
+                prev_actv_value = layers[i-1].network[k].actv_value;
                 prev_out_weight = layers[i-1].network[k].out_weights[j];
 
                 layers[i].network[j].value +=  prev_actv_value * prev_out_weight;
-                // Use of the activation function to calculate the activated value('actv_value')
-                activationFunction(i,j);
             }
+            // Use of the activation function to calculate the activated value('actv_value')
+            activationFunction(i,j);
         }
     }
 } 
 
 //----------------------------------BACK PROPAGATION--------------------------------
-// back propagation for Output Layer
-void backPropagationOutputLayer(int * vector){
-    int i,k;
-    float actv_value,d_value;
-    float prev_actv_value, prev_weight; // act and weight of a neuron of the previous layer
-    float correct_out;
-
-    for(i=0; i<K; i++){
-        actv_value = layers[TOTAL_LAYERS - 1].network[i].actv_value;
-        correct_out = vector[i];
-        layers[TOTAL_LAYERS -1].network[i].d_value = actv_value - correct_out*actv_value*(1 - actv_value);
-
-        for(k=0; k<H3_NEURONS; k++){
-            prev_actv_value = layers[TOTAL_LAYERS-2].network[k].actv_value;
-            d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
-            layers[TOTAL_LAYERS-2].network[k].d_out_weights[i] = prev_actv_value * d_value;
-            
-            // *** Not sure if needed!****!!!!!!!!!!!!!!!!!
-            prev_weight = layers[TOTAL_LAYERS-2].network[k].out_weights[i];
-            layers[TOTAL_LAYERS-2].network[k].d_actv_value = prev_weight * d_value;
-        }
-        layers[TOTAL_LAYERS-1].network[i].d_bias = d_value;
-    }
-}
 void d_relu(int layer, int neuron){
     if(layers[layer].network[neuron].actv_value < 0){
         layers[layer].network[neuron].d_value = 0;
@@ -353,7 +338,7 @@ void d_tahn(int layer, int neuron){
 }
 void d_logistic(int layer, int neuron){
     float actv_value = layers[layer].network[neuron].actv_value;
-    layers[layer].network[neuron].d_value = (float)actv_value*(1 - actv_value);
+    layers[layer].network[neuron].d_value = (float)actv_value*(1 - (float)actv_value);
 }
 void d_activationFunction(int layer, int neuron){
     if(ACTIVATION_FUNCTION == 0 ){ 
@@ -375,13 +360,37 @@ void backPropagationHiddenLayers(){
             d_activationFunction(i,j);
 
             for(k=0; k<layers[i-1].neurons_num; k++){
-                layers[i-1].network[k].d_out_weights[j] = layers[i].network[j].d_value * layers[i-1].network[k].actv_value;
+                layers[i-1].network[k].d_out_weights[j] += layers[i].network[j].d_value * layers[i-1].network[k].actv_value;
                 if(i>1){
-                    layers[i-1].network[k].d_actv_value = layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
+                    layers[i-1].network[k].d_actv_value += layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
                 }
             }
-            layers[i].network[j].d_bias = layers[i].network[j].d_value;
+            layers[i].network[j].d_bias += layers[i].network[j].d_value;
         }
+    }
+}
+// back propagation for Output Layer
+void backPropagationOutputLayer(int * vector){
+    int i,k;
+    float actv_value,d_value;
+    float prev_actv_value, prev_weight; // act_value and weight of a neuron of the previous layer
+    float correct_out;
+
+    for(i=0; i<K; i++){
+        actv_value = layers[TOTAL_LAYERS - 1].network[i].actv_value;
+        correct_out = vector[i];
+        layers[TOTAL_LAYERS -1].network[i].d_value = actv_value - correct_out*actv_value*(1 - actv_value);
+
+        for(k=0; k<H3_NEURONS; k++){
+            prev_actv_value = layers[TOTAL_LAYERS-2].network[k].actv_value;
+            d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
+            layers[TOTAL_LAYERS-2].network[k].d_out_weights[i] += (prev_actv_value * d_value);
+            
+            // *** Not sure if needed!****!!!!!!!!!!!!!!!!!
+            prev_weight = layers[TOTAL_LAYERS-2].network[k].out_weights[i];
+            layers[TOTAL_LAYERS-2].network[k].d_actv_value += prev_weight * d_value;
+        }
+        layers[TOTAL_LAYERS-1].network[i].d_bias += d_value;
     }
 }
 void backPropagation(int * vector){
@@ -389,13 +398,13 @@ void backPropagation(int * vector){
     backPropagationHiddenLayers();
 }
 //----------------------------------UPDATE WEIGHTS AND BIAS---------------------------------
-// Update weights and bias after a batch
+// Update weights and bias after a batch for Input & Hidden Layer
 void update(){
     int i,k,j;
-    for(i=0; i<TOTAL_LAYERS -1; i++){ 
-        for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
-            for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
-                layers[i].network[j].out_weights[k] -= LEARNING_RATE * layers[i].network[j].d_out_weights[k]; //
+    for(i=0; i<TOTAL_LAYERS -1 ; i++){ 
+        for(j=0; j<layers[i].neurons_num; j++){ 
+            for(k=0; k<layers[i + 1].neurons_num; k++){ 
+                layers[i].network[j].out_weights[k] -= LEARNING_RATE * layers[i].network[j].d_out_weights[k];
             }
             layers[i].network[j].bias -= LEARNING_RATE * layers[i].network[j].d_bias;
         }
@@ -428,11 +437,11 @@ void printMPLnetwork(char *filename){
         fprintf(fPtr,"\nLAYER: %d\nNEURONS: %d\n", i, layers[i].neurons_num);
         for(j=0; j<layers[i].neurons_num; j++){
             
-            fprintf(fPtr,"(neuron %d)\n",j);
+            fprintf(fPtr,"(neuron %d)\n",j+1);
             if(i!= 0 ){
                 fprintf(fPtr,"\tBIAS: %f\n",layers[i].network[j].bias);
             }
-            fprintf(fPtr,"\tVALUE: %f\n\tACTV: %f\n",layers[i].network[j].value,layers[i].network[j].actv_value);
+            fprintf(fPtr,"\tVALUE: %f\n\tACTV_VALUE: %f\n",layers[i].network[j].value,layers[i].network[j].actv_value);
             if( i < TOTAL_LAYERS -1){    
                 out_weights_size = layer_size[i+1];
                 fprintf(fPtr,"\tWEIGHTS: ");
@@ -440,7 +449,7 @@ void printMPLnetwork(char *filename){
                     fprintf(fPtr,"%f ",layers[i].network[j].out_weights[k]);
                 }
             }
-            fprintf(fPtr,"\n\n\tD_BIAS: %f\n\tD_VALUE: %f\n\tD_ACTV: %f\n",layers[i].network[j].d_bias, layers[i].network[j].d_value,layers[i].network[j].d_actv_value);
+            fprintf(fPtr,"\n\n\tD_BIAS: %f\n\tD_ACTV_VALUE: %f\n\tD_ACTV: %f\n",layers[i].network[j].d_bias, layers[i].network[j].d_value,layers[i].network[j].d_actv_value);
             if( i < TOTAL_LAYERS -1){    
                 fprintf(fPtr,"\tD_WEIGHTS: ");
                 for(k=0; k<out_weights_size; k++){
@@ -461,12 +470,12 @@ float calculateError(int* vec){
     }
     error = ((float)0.5*error);
     if(error == 0){
-        printf("wow! That was perfect training!");
+        printf("wow! That was perfect training round!\n");
     }
     return error;
 }
 //----------------------------------------Gradient Descent-------------------------------------
-void resetDerivatives(){ // NOT SURE IF NEEDED
+void resetDerivatives(){
     int i,k,j;
     for(i=0; i<TOTAL_LAYERS -1; i++){ 
         for(j=0; j<layers[i].neurons_num; j++){ 
@@ -493,7 +502,7 @@ void gradientDescent_MiniBatch(){
             backPropagation(training_data[i].vec);
             if(batch_size == BATCH_SIZE){
                 update(); // update weights and biases
-                resetDerivatives(); // reset derivative weights and biases to 0
+                resetDerivatives(); // reset derivative weights(d_out_wights) and biases(d_bias) to 0
                 batch_size = 0;
             }else{
                 batch_size++;
@@ -501,7 +510,7 @@ void gradientDescent_MiniBatch(){
         }
         fprintf(fPtr,"Epoch(%d): Total Error: %f\n",epochs+1,total_error);
         if((epochs > MIN_EPOCHS) && ((float)fabs(total_error - prev_total_error) < (float)ERROR_THRESHOLD)){
-            printf("Training completed!\n");
+            printf("Training completed after %d Epochs!\n",epochs);
             fclose(fPtr);
             return;
         }
@@ -513,6 +522,7 @@ void gradientDescent_MiniBatch(){
 }
 //-----------------------------------------GENERALISATION ABILITY--------------------------
 void  generalizationAbility(){
+    FILE * fPtr = fopen("generalization_results", "w");
     int i,real_category,final_category;
     int correct_decision = 0;
     float success;
@@ -521,22 +531,27 @@ void  generalizationAbility(){
         forwardPass();
         if(isCorrect(testing_data[i].vec)){
              correct_decision++;
+             fprintf(fPtr,"%f, %f +\n",testing_data[i].x1, testing_data[i].x2);
+        }else{
+            fprintf(fPtr,"%f ,%f -\n",testing_data[i].x1, testing_data[i].x2);
         }
     }
     success =  (float)(100 * correct_decision) / (float)TESTING_DATA;
     printf("\nGeneralization Ability = %.2f%c \n", success, '%');
+    fclose(fPtr);
 }
 
 //----------------------------------------MAIN--------------------------------------
 void main(){
+    srand(time(0));
     loadDataset("training_data.txt", training_data, TRAINING_DATA);
     loadDataset("testing_data.txt", testing_data, TESTING_DATA);
     createArchitecture();
-    printMPLnetwork("MPL_architecture.txt");
+    //printMPLnetwork("MPL_architecture.txt");
     gradientDescent_MiniBatch();
     generalizationAbility();
-    printMPLnetwork("MPL_after_training.txt");
-    printDataset("Training data",training_data,TRAINING_DATA);
+    //printMPLnetwork("MPL_after_training.txt");
+    //printDataset("Training data",training_data,TRAINING_DATA);
     //printDataset("Testing data",testing_data,TESTING_DATA);
     exitProgramm(0);
 }
