@@ -8,25 +8,25 @@
 #define TOTAL_LAYERS 5
 #define d 2 // x1 x2
 #define K 3 // Number of categories
-#define H1_NEURONS 3
+#define H1_NEURONS 2
 #define H2_NEURONS 2
-#define H3_NEURONS 5
-#define ACTIVATION_FUNCTION 1 //0 for "tanh", 1 for "relu", 2 for "logistic"
+#define H3_NEURONS 2
+#define ACTIVATION_FUNCTION 2 //0 for "tanh", 1 for "relu", 2 for "logistic"
 
-#define LEARNING_RATE 0.001
+#define LEARNING_RATE 0.01
 #define ERROR_THRESHOLD 0.01
 
 #define TRAINING_DATA 4000
 #define TESTING_DATA 4000 
 
 #define MIN_EPOCHS 700
-#define MAX_EPOCHS 1000
+#define MAX_EPOCHS 5000
 
 /*About Batch sizes
 Small values give a learning process that converges quickly at the cost of noise in the training process.
 Large values give a learning process that converges slowly with accurate estimates of the error gradient.
 */
-#define BATCH_SIZE 400 // TRAINING_DATA/10=400 or TRAINING_DATA/100=40
+#define BATCH_SIZE 40 // TRAINING_DATA/10=400 or TRAINING_DATA/100=40
 
 
 /* 
@@ -38,9 +38,9 @@ C2 -> (0,1,0)
 C3 -> (0,0,1) 
 */ 
 struct data {
-	double x1; // input1
-	double x2; // input2
-    int vec[K]; // Output 
+	double x1; 
+	double x2; 
+    int vec[K];  
 };
 
 // MPL neuron
@@ -88,7 +88,7 @@ int getOutputNeuron(){
             category = i;
         }
     }
-    printf("c:%d ", category);
+    //printf("c:%d ", category);
     return category; // FIX returns always the same!
 }
 // Check if Output neuron after training is the one expected
@@ -159,7 +159,7 @@ void initializeWeights(){
         for(j=0; j<layers[i].neurons_num; j++){ // 2->6->4->2 (Neurons in layers 1-4)
             for(k=0; k<layers[i + 1].neurons_num; k++){ // number of output weights == number of neurons in the next layer
                 layers[i].network[j].out_weights[k] = ((double)(rand() % 200) / (double)100) - 1;  // [-1,1]
-                layers[i].network[j].d_out_weights[k] = 0.0;
+                layers[i].network[j].d_out_weights[k] = 0.0; 
             } 
         } 
     }                 
@@ -272,16 +272,23 @@ void tahn(int layer, int neuron){
 }
 
 // Shoud I use this for Output layer?
-void softmax(int neuron) {
+void softmax() {
     int i;
-    double x,sum = 0.0;
-    for (i = 0; i < K; i++){
-        x = layers[TOTAL_LAYERS-2].network[neuron].out_weights[i];
-        sum += exp(x);
+    float offset,x,sum = 0.0;
+    float m = -INFINITY;
+    for (size_t i = 0; i < K; i++) {
+        if (layers[TOTAL_LAYERS-1].network[i].value > m) {
+        m = layers[TOTAL_LAYERS-1].network[i].value;
     }
+  }
     for (i = 0; i < K; i++){
-        x = layers[TOTAL_LAYERS-2].network[neuron].out_weights[i];     
-        layers[TOTAL_LAYERS-1].network[neuron].actv_value = exp(x) / sum;
+        x = layers[TOTAL_LAYERS-1].network[i].value;
+        sum += exp(x -m);
+    }
+    offset = m + logf(sum);
+    for (i = 0; i < K; i++){
+        x = layers[TOTAL_LAYERS-1].network[i].value;     
+        layers[TOTAL_LAYERS-1].network[i].actv_value = exp(x -offset);
     }
 }
 /* 
@@ -307,8 +314,8 @@ void activationFunction(int layer, int neuron){
             exitProgramm(6);
         }
     }else{                         // Output Layer
-        //logistic(TOTAL_LAYERS-1,neuron);
-        softmax(neuron);
+        logistic(TOTAL_LAYERS-1,neuron);
+        //softmax();
     }
 }
 
@@ -349,11 +356,19 @@ void d_tahn(int layer, int neuron){
     double d_actv_value = layers[layer].network[neuron].d_actv_value;
     layers[layer].network[neuron].d_value = d_tahn_result * d_actv_value;
 }
-void d_logistic(int layer, int neuron){
+void d_logistic(int layer, int neuron,int *vector){
     double actv_value = layers[layer].network[neuron].actv_value;
-    layers[layer].network[neuron].d_value = (double)actv_value*(1 - (double)actv_value);
+    if(layer == TOTAL_LAYERS-1){
+        int correct_out = vector[neuron];
+        double d_error = actv_value - correct_out;
+        layers[TOTAL_LAYERS -1].network[neuron].d_value = d_error*actv_value*(1 - actv_value);
+    }else{
+        layers[layer].network[neuron].d_value = actv_value*(1 - actv_value);
+    }
 }
-void d_activationFunction(int layer, int neuron){
+
+
+void d_activationFunction(int layer, int neuron,int *vector){
 
     if(!checkIfOutputLayer(layer)){ // Hidded Layers
         if(ACTIVATION_FUNCTION == 0 ){ 
@@ -361,27 +376,29 @@ void d_activationFunction(int layer, int neuron){
         }else if(ACTIVATION_FUNCTION == 1 ){                         
             d_relu(layer,neuron);
         }else if(ACTIVATION_FUNCTION == 2 ){
-            d_logistic(layer,neuron);
+            d_logistic(layer,neuron, NULL);
         }else{
             printf("Unknown Derivation function!");
             exitProgramm(6);
         }
     }else{
-        d_logistic(layer,neuron);
+        d_logistic(layer,neuron,vector); 
     }
 }
 void backPropagationHiddenLayers(){
     int i,j,k,l;
     for(i=TOTAL_LAYERS -2; i>0; i--){
         for(j=0;j<layers[i].neurons_num; j++){
-            //layers[i].network[j].d_actv_value = 0.0;
-            d_activationFunction(i,j);
-
+            layers[i].network[j].d_actv_value = 0.0;
+            for(k=0; k<layers[i+1].neurons_num; k++){
+                layers[i].network[j].d_actv_value += (layers[i].network[j].out_weights[k] * layers[i+1].network[k].d_value);
+            }
+            d_activationFunction(i,j,NULL);
             for(k=0; k<layers[i-1].neurons_num; k++){
                 layers[i-1].network[k].d_out_weights[j] += layers[i].network[j].d_value * layers[i-1].network[k].actv_value;
-                if(i>1){
+                /*/if(i>1){
                     layers[i-1].network[k].d_actv_value += layers[i-1].network[k].out_weights[j] * layers[i].network[j].d_value;
-                }
+                }*/
             }
             layers[i].network[j].d_bias += layers[i].network[j].d_value;
         }
@@ -395,18 +412,16 @@ void backPropagationOutputLayer(int * vector){
     double correct_out;
 
     for(i=0; i<K; i++){
-        actv_value = layers[TOTAL_LAYERS - 1].network[i].actv_value;
-        correct_out = vector[i];
-        layers[TOTAL_LAYERS -1].network[i].d_value = actv_value - correct_out*actv_value*(1 - actv_value);
-
+        layers[TOTAL_LAYERS-1].network[i].d_actv_value = 0.0;
+        d_activationFunction(TOTAL_LAYERS-1,i,vector);
+        d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
         for(k=0; k<H3_NEURONS; k++){
             prev_actv_value = layers[TOTAL_LAYERS-2].network[k].actv_value;
-            d_value = layers[TOTAL_LAYERS-1].network[i].d_value;
             layers[TOTAL_LAYERS-2].network[k].d_out_weights[i] += (prev_actv_value * d_value);
             
             // *** Not sure if needed!****!!!!!!!!!!!!!!!!!
-            prev_weight = layers[TOTAL_LAYERS-2].network[k].out_weights[i];
-            layers[TOTAL_LAYERS-2].network[k].d_actv_value += prev_weight * d_value;
+            //prev_weight = layers[TOTAL_LAYERS-2].network[k].out_weights[i];
+            //layers[TOTAL_LAYERS-2].network[k].d_actv_value += prev_weight * d_value;
         }
         layers[TOTAL_LAYERS-1].network[i].d_bias += d_value;
     }
@@ -487,9 +502,6 @@ double calculateError(int* vec){
         error += (double)pow(diff,2);
     }
     error = ((double)0.5*error);
-    if(error == 0){
-        printf("wow! That was perfect training round!\n");
-    }
     return error;
 }
 //----------------------------------------Gradient Descent-------------------------------------
@@ -510,7 +522,8 @@ void gradientDescent_MiniBatch(){
     int i,j;
     double total_error;
     double prev_total_error = 0;
-    int batch_size, epochs = 0;
+    int batch_size = 0;
+    int epochs = 0;
     while(epochs < MAX_EPOCHS){
         total_error = 0;
         for(i=0; i<TRAINING_DATA; i++){
@@ -568,7 +581,7 @@ void main(){
     //printMPLnetwork("MPL_architecture.txt");
     gradientDescent_MiniBatch();
     generalizationAbility();
-    //printMPLnetwork("MPL_after_training.txt");
+    printMPLnetwork("MPL_after_training.txt");
     //printDataset("Training data",training_data,TRAINING_DATA);
     //printDataset("Testing data",testing_data,TESTING_DATA);
     exitProgramm(0);
