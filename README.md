@@ -4,7 +4,7 @@ Classification neural network based on multilayer perceptron with three hidden l
 
 
 Compile dataset:
- `gcc dataset1.c -o dataset -lm`
+ `gcc dataset.c -o dataset -lm`
 
 Compile classifier:
 `gcc classifier.c -o cliassifier`
